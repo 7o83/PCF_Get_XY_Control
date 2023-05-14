@@ -1,0 +1,7 @@
+.CustomControl.GetXYControl .TargetRect {   
+  background: rgba(149,37,155,0.5);
+}
+
+.CustomControl\.GetXYControl .TargetRectTransparent {   
+  background: rgba(149,37,155,0);
+}
