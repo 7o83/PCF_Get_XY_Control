@@ -6,7 +6,9 @@ export class GetXYControl implements ComponentFramework.StandardControl<IInputs,
   private _notifyOutputChanged: () => void;
 
   private _context: ComponentFramework.Context<IInputs>;
-  private _refreshData: EventListenerOrEventListenerObject;
+  private _refreshDataOnClick: EventListenerOrEventListenerObject;
+  private _refreshDataOnDrag: EventListenerOrEventListenerObject;
+  private _refreshEventListener: Function;
 
   private _container: HTMLDivElement;
   private targetDivElement: HTMLDivElement;
@@ -14,12 +16,97 @@ export class GetXYControl implements ComponentFramework.StandardControl<IInputs,
   private _offsetX: number;
   private _offsetY: number;
   private _display: boolean;
+  private _mode: string;
+  private _dragging: boolean;
+  private _updateInterval: number;
 
-  public refreshData(evt: Event): void {
-    //console.log("call_refreshData");
-    this._offsetX = (evt as MouseEvent).offsetX as number;
-    this._offsetY = (evt as MouseEvent).offsetY as number;
+  private _intervalId: number;
+  private _beforeMode: string;
+
+  public refreshDataOnClick(evt: Event): void {
+    //console.log("call_refreshDataOnClick");
+    this._offsetX = (evt as MouseEvent).offsetX;
+    this._offsetY = (evt as MouseEvent).offsetY;
     this._notifyOutputChanged();
+  }
+
+  public refreshDataOnDrag(evt: Event): void {
+    //console.log("call_refreshDataOnDrag");
+    const targetRect = this.targetDivElement.getBoundingClientRect();
+
+    switch (evt.type) {
+      case "mousedown":
+      case "mousemove":
+      case "mouseup":
+      case "mouseleave":
+        this._offsetX = (evt as MouseEvent).offsetX;
+        this._offsetY = (evt as MouseEvent).offsetY;
+        break;
+
+      case "touchstart":
+      case "touchmove":
+      case "touchend":
+        this._offsetX = (evt as TouchEvent).changedTouches[0].clientX - targetRect.left;
+        this._offsetY = (evt as TouchEvent).changedTouches[0].clientY - targetRect.top;
+        break;
+
+    }
+
+    switch (evt.type) {
+      case "mousedown":
+      case "touchstart":
+        evt.preventDefault();
+        this._dragging = true;
+        this._notifyOutputChanged();
+        this._intervalId = window.setInterval(this._notifyOutputChanged, this._updateInterval);
+
+        this.targetDivElement.addEventListener("mousemove", this._refreshDataOnDrag, { passive: false });
+        this.targetDivElement.addEventListener("touchmove", this._refreshDataOnDrag, { passive: false });
+        this.targetDivElement.addEventListener("mouseup", this._refreshDataOnDrag, { passive: false });
+        this.targetDivElement.addEventListener("mouseleave", this._refreshDataOnDrag, { passive: false });
+        this.targetDivElement.addEventListener("touchend", this._refreshDataOnDrag, { passive: false });
+        break;
+
+      case "mousemove":
+      case "touchmove":
+        break;
+
+      case "mouseup":
+      case "touchend":
+      case "mouseleave":
+        this._dragging = false;
+        this._notifyOutputChanged();
+        clearInterval(this._intervalId);
+        this._intervalId = 0;
+
+        this.targetDivElement.removeEventListener("mousemove", this._refreshDataOnDrag);
+        this.targetDivElement.removeEventListener("touchmove", this._refreshDataOnDrag);
+        this.targetDivElement.removeEventListener("mouseup", this._refreshDataOnDrag);
+        this.targetDivElement.removeEventListener("mouseleave", this._refreshDataOnDrag);
+        this.targetDivElement.removeEventListener("touchend", this._refreshDataOnDrag);
+        break;
+
+    }
+  }
+
+  public refreshEventListener(): void {
+    //console.log("call_refreshEventListener");
+    switch (this._mode) {
+      case "0":
+        this.targetDivElement.removeEventListener("mousedown", this._refreshDataOnDrag);
+        this.targetDivElement.removeEventListener("touchstart", this._refreshDataOnDrag);
+
+        this.targetDivElement.addEventListener("click", this._refreshDataOnClick, false);
+        break;
+
+      case "1":
+        this.targetDivElement.removeEventListener("click", this._refreshDataOnClick);
+
+        this.targetDivElement.addEventListener("mousedown", this._refreshDataOnDrag, { passive: false });
+        this.targetDivElement.addEventListener("touchstart", this._refreshDataOnDrag, { passive: false });
+        break;
+
+    }
   }
   /** ADDend */
 
@@ -45,7 +132,9 @@ export class GetXYControl implements ComponentFramework.StandardControl<IInputs,
     context.mode.trackContainerResize(true);
 
     this._notifyOutputChanged = notifyOutputChanged;
-    this._refreshData = this.refreshData.bind(this);
+    this._refreshDataOnClick = this.refreshDataOnClick.bind(this);
+    this._refreshDataOnDrag = this.refreshDataOnDrag.bind(this);
+    this._refreshEventListener = this.refreshEventListener;
 
     this._context = context;
     this._container = document.createElement("div");
@@ -56,17 +145,18 @@ export class GetXYControl implements ComponentFramework.StandardControl<IInputs,
     container.appendChild(this._container);
 
     this._display = context.parameters.display.raw!;
-    //console.log(context.parameters.display);
     this.targetDivElement.setAttribute("class",
-    this._display
+      this._display
         ? "TargetRect"
         : "TargetRectTransparent"
     );
 
-    this.targetDivElement.addEventListener("click", this._refreshData);
+    this._dragging = false;
+    this._mode = context.parameters.mode.raw!;
+    this._updateInterval = context.parameters.updateInterval.raw!;
+    this._refreshEventListener();
     /** ADDend */
   }
-
 
   /**
    * Called when any value in the property bag has changed. This includes field values, data-sets, global values such as container height and width, offline status, control metadata values such as label, visible, etc.
@@ -76,16 +166,21 @@ export class GetXYControl implements ComponentFramework.StandardControl<IInputs,
     // Add code to update control view
     /** ADDstart */
     //console.log("call_update");
-    this.targetDivElement.style.setProperty("height", this._context.mode.allocatedHeight.toString() + "px");
-    this.targetDivElement.style.setProperty("width", this._context.mode.allocatedWidth.toString() + "px");
-
+    this.targetDivElement.style.setProperty("height", (this._context.mode.allocatedHeight.toString() || "0") + "px");
+    this.targetDivElement.style.setProperty("width", (this._context.mode.allocatedWidth.toString() || "0") + "px");
     this._display = context.parameters.display.raw!;
-    //console.log("displayvalue",context.parameters.display);
     this.targetDivElement.setAttribute("class",
-    this._display
+      this._display
         ? "TargetRect"
         : "TargetRectTransparent"
     );
+    this._beforeMode = this._mode;
+    this._mode = context.parameters.mode.raw!;
+    this._updateInterval = context.parameters.updateInterval.raw!;
+    if (this._beforeMode != this._mode) {
+      this._dragging = false;
+      this._refreshEventListener();
+    }
     /** ADDend */
   }
 
@@ -99,7 +194,10 @@ export class GetXYControl implements ComponentFramework.StandardControl<IInputs,
       /** ADDstart */
       offsetX: this._offsetX,
       offsetY: this._offsetY,
-      display: this._display
+      display: this._display,
+      mode: this._mode,
+      dragging: this._dragging,
+      updateInterval: this._updateInterval
       /** ADDend */
     };
   }
@@ -112,7 +210,14 @@ export class GetXYControl implements ComponentFramework.StandardControl<IInputs,
     // Add code to cleanup control if necessary
     /** ADDstart */
     //console.log("call_destoroy");
-    this.targetDivElement.removeEventListener("click", this._refreshData);
+    this.targetDivElement.removeEventListener("click", this._refreshDataOnClick);
+    this.targetDivElement.removeEventListener("mousedown", this._refreshDataOnDrag);
+    this.targetDivElement.removeEventListener("touchstart", this._refreshDataOnDrag);
+    this.targetDivElement.removeEventListener("mousemove", this._refreshDataOnDrag);
+    this.targetDivElement.removeEventListener("touchmove", this._refreshDataOnDrag);
+    this.targetDivElement.removeEventListener("mouseup", this._refreshDataOnDrag);
+    this.targetDivElement.removeEventListener("mouseleave", this._refreshDataOnDrag);
+    this.targetDivElement.removeEventListener("touchend", this._refreshDataOnDrag);
     /** ADDend */
   }
 }

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="CustomControl" constructor="GetXYControl" version="0.0.1"
+  <control namespace="CustomControl" constructor="GetXYControl" version="1.0.10"
     display-name-key="GetXYControl" description-key="GetXYControl description"
     control-type="standard">
     <!--external-service-usage
@@ -44,8 +44,20 @@
     <property name="offsetY" display-name-key="offsetY Value"
       description-key="offsetY Value" of-type-group="numbers" usage="bound"
       required="true" />
-    <property name="display" display-name-key="display Value"
-      description-key="display Value" of-type="TwoOptions" usage="bound"
+    <property name="display" display-name-key="display Value (Transparent or not)"
+      description-key="display Value (Transparent or not)" of-type="TwoOptions" usage="bound"
+      required="true" />
+    <property name="mode" display-name-key="mode Value (click or drag)"
+      description-key="mode Value (click or drag)" of-type="Enum" usage="bound"
+      required="true">
+      <value name="click" display-name-key="click">0</value>
+      <value name="drag" display-name-key="drag">1</value>
+    </property>
+    <property name="dragging" display-name-key="dragging Value (only in drag mode)"
+      description-key="dragging Value (only in drag mode)" of-type="TwoOptions" usage="bound"
+      required="true" />
+    <property name="updateInterval" display-name-key="updateInterval Value. 101 or higher (only in drag mode)"
+      description-key="updateInterval Value. 101 or higher (only in drag mode)" of-type-group="numbers" usage="bound"
       required="true" />
     <!--ADDend-->
     <!--
